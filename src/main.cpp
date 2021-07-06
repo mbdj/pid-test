@@ -7,10 +7,11 @@ unsigned long changeStateCounter{0}; // compte le nombre de changements d'état 
 const int numberOfBlades{4}; // nombre de pales du moteur
                              // pour chaque pale on a 2 changements du capteur
 
-unsigned long beginTime;                                  // instant du dernier changement de valeur
-unsigned long currentTime;                                // instant de le mesure courante
-const unsigned long delayMs{1000};                        // délai de mesure en milliseconde
-const unsigned long k{delayMs / (numberOfBlades * 1000)}; // coefficient par lequel il faut multiplier le nombre de changements pour avoir la vitesse en tr/sec
+unsigned long beginTime;                                          // instant du dernier changement de valeur
+unsigned long currentTime;                                        // instant de le mesure courante
+const unsigned long delayMs{1000};                                // délai de mesure en milliseconde
+const float k{(float)delayMs / ((float)numberOfBlades * 1000.0)}; // coefficient par lequel il faut multiplier le nombre de changements pour avoir la vitesse en tr/sec
+
 int newValue;
 int oldValue;
 
@@ -44,7 +45,8 @@ void loop()
   unsigned long d = currentTime - beginTime; // délai depuis le début du comptage
   if (d > delayMs)
   {
-    Serial.println(changeStateCounter * k);
+    float speedTrMin = changeStateCounter * k;
+    Serial.println(speedTrMin);
     beginTime = currentTime;
     changeStateCounter = 0;
   }
