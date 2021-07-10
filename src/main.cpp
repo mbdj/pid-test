@@ -1,7 +1,7 @@
 #include <Arduino.h>
 
 // variables globales pour le capteur réflechissant
-const uint8_t pinINSensor{13};       // pin de lecture du capteur : HIGH si capte un objet réfléchissant à proximité sinon LOW
+const uint8_t pinIN_IRsensor{13};    // pin de lecture du capteur : HIGH si capte un objet réfléchissant à proximité sinon LOW
 unsigned long changeStateCounter{0}; // compte le nombre de changements d'état du capteur afin de calculer la vitesse du moteur
 
 const int numberOfBlades{4}; // nombre de pales du moteur sur lesquelles se réflechit la lumière du capteur
@@ -60,12 +60,17 @@ void brake(int rate)
 }
 */
 
+const uint8_t pinIN_Pot{4}; // pin pour la lecture du potentiomètre ; sa valeur fixe la vitesse du moteur 0 à 255
+
 void setup()
 {
   Serial.begin(9600);
 
-  // initialisation du capteur
-  pinMode(pinINSensor, INPUT);
+  // initialisation de la pin du potentiomètre
+  pinMode(pinIN_Pot, INPUT);
+
+  // initialisation du capteur IR
+  pinMode(pinIN_IRsensor, INPUT);
   beginTime = micros(); // initialisation
   oldValue = LOW;       // initialisation. L'état est supposé LOW au départ
 
@@ -76,9 +81,6 @@ void setup()
   pinMode(pinOUTPUT_1A, OUTPUT);
   pinMode(pinOUTPUT_2A, OUTPUT);
   */
-
-  // Démarrage du moteur
-  run(100);
 }
 
 void loop()
@@ -86,11 +88,17 @@ void loop()
   // affichage de l'état du capteur : HAUT = détection ; BAS = pas de détection
   //digitalRead(pinINSensor) == HIGH ? Serial.write("HAUT\n") : Serial.write("BAS\n");
 
+// lecture du potentiomètre qui fixe la vitesse du moteur
+// et activation du moteur
+  int v = map(analogRead(pinIN_Pot),0,1023,0,255);
+  Serial.println(v);
+  run(v);
+
   // On incrémente un compteur durant le délai delayMs
 
   // Si on détecte un changement d'état du capteur on incrémente le compteur
   currentTime = millis();
-  newValue = digitalRead(pinINSensor);
+  newValue = digitalRead(pinIN_IRsensor);
   if (newValue != oldValue)
   {
     changeStateCounter++;
@@ -102,7 +110,7 @@ void loop()
   if (d > delayMs)
   {
     float speedTrMin = changeStateCounter * k;
-    Serial.println(speedTrMin);
+    //Serial.println(speedTrMin);
     beginTime = currentTime;
     changeStateCounter = 0;
   }
