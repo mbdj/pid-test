@@ -20,16 +20,24 @@ int oldValue;
 // Contrôles du moteur
 //=====================
 // Commande du moteur
-const uint8_t pinPWM_EN{3};    // pin 1 du L293D : la valeur pwm détermine la vitesse du moteur
-const uint8_t pinOUTPUT_1A{4}; // pin 2 du L293D : 1A et 2A sont les switchs qui contrôlent le sens ou l'arrêt du moteur
-const uint8_t pinOUTPUT_2A{7}; // pin 7 du L293D : 1A et 2A sont les switchs qui contrôlent le sens ou l'arrêt du moteur
+//const uint8_t pinPWM_EN{3};    // pin 1 du L293D : la valeur pwm détermine la vitesse du moteur
+//const uint8_t pinOUTPUT_1A{4}; // pin 2 du L293D : 1A et 2A sont les switchs qui contrôlent le sens ou l'arrêt du moteur
+//const uint8_t pinOUTPUT_2A{7}; // pin 7 du L293D : 1A et 2A sont les switchs qui contrôlent le sens ou l'arrêt du moteur
+const uint8_t pinPWM_Motor{3}; // pin contrôlant la vitesse du moteur par PWM (connecté à la gate du mosfet alimentant le moteur)
 
+//
+inline void run(int rate)
+{
+  analogWrite(pinPWM_Motor, rate);
+}
+
+/*
 // tourne dans un sens
 void forward(int rate)
 {
-  analogWrite(pinPWM_EN, LOW);
-  digitalWrite(pinOUTPUT_1A, HIGH);
-  digitalWrite(pinOUTPUT_2A, LOW);
+  //analogWrite(pinPWM_EN, LOW);
+  //digitalWrite(pinOUTPUT_1A, HIGH);
+  //digitalWrite(pinOUTPUT_2A, LOW);
   analogWrite(pinPWM_EN, rate);
 }
 
@@ -50,6 +58,7 @@ void brake(int rate)
   digitalWrite(pinOUTPUT_2A, LOW);
   analogWrite(pinPWM_EN, HIGH);
 }
+*/
 
 void setup()
 {
@@ -61,12 +70,15 @@ void setup()
   oldValue = LOW;       // initialisation. L'état est supposé LOW au départ
 
   // initialisation du moteur
+  pinMode(pinPWM_Motor, OUTPUT);
+  /*
   pinMode(pinPWM_EN, OUTPUT);
   pinMode(pinOUTPUT_1A, OUTPUT);
   pinMode(pinOUTPUT_2A, OUTPUT);
+  */
 
   // Démarrage du moteur
-  forward(200);
+  run(100);
 }
 
 void loop()
