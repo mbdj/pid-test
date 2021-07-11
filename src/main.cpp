@@ -22,14 +22,15 @@ int newValue;
 int oldValue;
 
 // vitesse mesurée du moteur
-float speedTrMin;
+float speedTrMin; // vitesse du moteur en tr/min
+int motorDC{1};   // tension DC appliquée sur le moteur
 
 //=====================
 // Contrôles du moteur
 //=====================
 const uint8_t pinPWM_Motor{3}; // pin contrôlant la vitesse du moteur par PWM (connecté à la gate du mosfet alimentant le moteur)
 
-inline void motorSpeed(int rate)
+inline void motorRun(int rate)
 {
   analogWrite(pinPWM_Motor, rate);
 }
@@ -55,9 +56,6 @@ void setup()
 
   // initialisation du moteur
   pinMode(pinPWM_Motor, OUTPUT);
-
-  lcd.init(); // initialize the lcd
-  //lcd.backlight();
 }
 
 void loop()
@@ -65,13 +63,10 @@ void loop()
   // affichage de l'état du capteur : HAUT = détection ; BAS = pas de détection
   //digitalRead(pinIN_IRsensor) == HIGH ? Serial.write("HAUT\n") : Serial.write("BAS\n");
 
-  // lecture du potentiomètre qui fixe la vitesse du moteur
-  // et activation du moteur
-  int v = map(analogRead(pinIN_Pot), 0, 1023, 0, 255);
-  motorSpeed(v);
+  // lecture du potentiomètre qui fixe la consigne de vitesse du moteur
+  int orderSpeed = map(analogRead(pinIN_Pot), 0, 1023, 0, 255);
 
   // On incrémente un compteur durant le délai delayMs
-
   // Si on détecte un changement d'état du capteur on incrémente le compteur
   currentTime = millis();
   newValue = digitalRead(pinIN_IRsensor);
@@ -87,14 +82,24 @@ void loop()
   {
     speedTrMin = changeStateCounter * k;
 
+    // on adapte la vitesse pour rattraper la consigne
+    // asservissement très basique (on augmente ou on diminue selon la consigne)
+    if (speedTrMin < orderSpeed)
+      motorDC += 10;
+    else
+      motorDC -= 10;
+
+    motorRun(motorDC);
+
     beginTime = currentTime;
     changeStateCounter = 0;
 
     // Affichage de la consigne et de la vitesse
+    // tous les delayMs également
     lcd.clear();
     lcd.setCursor(0, 0); // ligne 0
     lcd.print("consigne :");
-    lcd.print(v);
+    lcd.print(orderSpeed);
     lcd.setCursor(0, 1); // ligne 1
     lcd.print("mesure   :");
     lcd.print(speedTrMin);
