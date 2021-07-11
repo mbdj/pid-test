@@ -1,7 +1,12 @@
 #include <Arduino.h>
 
+// Pour l'écran lcd
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+LiquidCrystal_I2C lcd(0x27, 16, 2); // set the LCD address to 0x27 for a 16 chars and 2 line display
+
 // variables globales pour le capteur réflechissant
-const uint8_t pinIN_IRsensor{13};    // pin de lecture du capteur : HIGH si capte un objet réfléchissant à proximité sinon LOW
+const uint8_t pinIN_IRsensor{12};    // pin de lecture du capteur : HIGH si capte un objet réfléchissant à proximité sinon LOW
 unsigned long changeStateCounter{0}; // compte le nombre de changements d'état du capteur afin de calculer la vitesse du moteur
 
 const int numberOfBlades{4}; // nombre de pales du moteur sur lesquelles se réflechit la lumière du capteur
@@ -16,55 +21,29 @@ const float k{(float)delayMs / ((float)numberOfBlades * 1000.0)}; // coefficient
 int newValue;
 int oldValue;
 
+// vitesse mesurée du moteur
+float speedTrMin;
+
 //=====================
 // Contrôles du moteur
 //=====================
-// Commande du moteur
-//const uint8_t pinPWM_EN{3};    // pin 1 du L293D : la valeur pwm détermine la vitesse du moteur
-//const uint8_t pinOUTPUT_1A{4}; // pin 2 du L293D : 1A et 2A sont les switchs qui contrôlent le sens ou l'arrêt du moteur
-//const uint8_t pinOUTPUT_2A{7}; // pin 7 du L293D : 1A et 2A sont les switchs qui contrôlent le sens ou l'arrêt du moteur
 const uint8_t pinPWM_Motor{3}; // pin contrôlant la vitesse du moteur par PWM (connecté à la gate du mosfet alimentant le moteur)
 
-//
-inline void run(int rate)
+inline void motorSpeed(int rate)
 {
   analogWrite(pinPWM_Motor, rate);
 }
 
-/*
-// tourne dans un sens
-void forward(int rate)
-{
-  //analogWrite(pinPWM_EN, LOW);
-  //digitalWrite(pinOUTPUT_1A, HIGH);
-  //digitalWrite(pinOUTPUT_2A, LOW);
-  analogWrite(pinPWM_EN, rate);
-}
-
-// tourne dans l'autre sens
-void reverse(int rate)
-{
-  analogWrite(pinPWM_EN, LOW);
-  digitalWrite(pinOUTPUT_1A, LOW);
-  digitalWrite(pinOUTPUT_2A, HIGH);
-  analogWrite(pinPWM_EN, rate);
-}
-
-// arrêt du moteur
-void brake(int rate)
-{
-  analogWrite(pinPWM_EN, LOW);
-  digitalWrite(pinOUTPUT_1A, LOW);
-  digitalWrite(pinOUTPUT_2A, LOW);
-  analogWrite(pinPWM_EN, HIGH);
-}
-*/
-
+// Potentionmètre qui fixe la vitesse du moteur
 const uint8_t pinIN_Pot{4}; // pin pour la lecture du potentiomètre ; sa valeur fixe la vitesse du moteur 0 à 255
 
 void setup()
 {
-  Serial.begin(9600);
+  //Serial.begin(9600);
+
+  // initialisation du lcd
+  lcd.init();
+  lcd.backlight();
 
   // initialisation de la pin du potentiomètre
   pinMode(pinIN_Pot, INPUT);
@@ -76,23 +55,20 @@ void setup()
 
   // initialisation du moteur
   pinMode(pinPWM_Motor, OUTPUT);
-  /*
-  pinMode(pinPWM_EN, OUTPUT);
-  pinMode(pinOUTPUT_1A, OUTPUT);
-  pinMode(pinOUTPUT_2A, OUTPUT);
-  */
+
+  lcd.init(); // initialize the lcd
+  //lcd.backlight();
 }
 
 void loop()
 {
   // affichage de l'état du capteur : HAUT = détection ; BAS = pas de détection
-  //digitalRead(pinINSensor) == HIGH ? Serial.write("HAUT\n") : Serial.write("BAS\n");
+  //digitalRead(pinIN_IRsensor) == HIGH ? Serial.write("HAUT\n") : Serial.write("BAS\n");
 
-// lecture du potentiomètre qui fixe la vitesse du moteur
-// et activation du moteur
-  int v = map(analogRead(pinIN_Pot),0,1023,0,255);
-  Serial.println(v);
-  run(v);
+  // lecture du potentiomètre qui fixe la vitesse du moteur
+  // et activation du moteur
+  int v = map(analogRead(pinIN_Pot), 0, 1023, 0, 255);
+  motorSpeed(v);
 
   // On incrémente un compteur durant le délai delayMs
 
@@ -109,9 +85,18 @@ void loop()
   unsigned long d = currentTime - beginTime; // délai depuis le début du comptage
   if (d > delayMs)
   {
-    float speedTrMin = changeStateCounter * k;
-    //Serial.println(speedTrMin);
+    speedTrMin = changeStateCounter * k;
+
     beginTime = currentTime;
     changeStateCounter = 0;
+
+    // Affichage de la consigne et de la vitesse
+    lcd.clear();
+    lcd.setCursor(0, 0); // ligne 0
+    lcd.print("consigne :");
+    lcd.print(v);
+    lcd.setCursor(0, 1); // ligne 1
+    lcd.print("mesure   :");
+    lcd.print(speedTrMin);
   }
 }
