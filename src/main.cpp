@@ -22,8 +22,8 @@ int newValue;
 int oldValue;
 
 // vitesse mesurée du moteur
-float speedTrMin; // vitesse du moteur en tr/min
-int motorDC{1};   // tension DC appliquée sur le moteur
+float measuredSpeed; // vitesse du moteur en tr/min
+int motorDC{1};      // tension DC appliquée sur le moteur
 
 //=====================
 // Contrôles du moteur
@@ -80,14 +80,11 @@ void loop()
   unsigned long d = currentTime - beginTime; // délai depuis le début du comptage
   if (d > delayMs)
   {
-    speedTrMin = changeStateCounter * k;
+    measuredSpeed = changeStateCounter * k;
 
-    // on adapte la vitesse pour rattraper la consigne
-    // asservissement très basique (on augmente ou on diminue selon la consigne)
-    if (speedTrMin < orderSpeed)
-      motorDC += 10;
-    else
-      motorDC -= 10;
+    // asservissement basique (mais perso !)
+    // on rattrape la consigne en injectant le 1/3 de la différence entre consigne et mesure
+    motorDC += (orderSpeed - measuredSpeed) / 2;
 
     motorRun(motorDC);
 
@@ -102,6 +99,6 @@ void loop()
     lcd.print(orderSpeed);
     lcd.setCursor(0, 1); // ligne 1
     lcd.print("mesure   :");
-    lcd.print(speedTrMin);
+    lcd.print(measuredSpeed);
   }
 }
