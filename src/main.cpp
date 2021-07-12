@@ -1,29 +1,36 @@
 #include <Arduino.h>
 
-// Pour l'écran lcd
+// Ecran lcd
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
 LiquidCrystal_I2C lcd(0x27, 16, 2); // set the LCD address to 0x27 for a 16 chars and 2 line display
 
-// variables globales pour le capteur réflechissant
+// Capteur réflechissant TCRT5000
 const uint8_t pinIN_IRsensor{12};    // pin de lecture du capteur : HIGH si capte un objet réfléchissant à proximité sinon LOW
-unsigned long changeStateCounter{0}; // compte le nombre de changements d'état du capteur afin de calculer la vitesse du moteur
+unsigned long changeStateCounter{0}; // compteur du nombre de changements d'état du capteur afin de calculer la vitesse du moteur
 
+// hélice du moteur permettant de calculer sa vitesse
 const int numberOfBlades{4}; // nombre de pales du moteur sur lesquelles se réflechit la lumière du capteur
-                             // pour chaque pale on a 2 changements du capteur
+                             // pour chaque pale on a 2 changements d'état du capteur
 
-unsigned long beginTime;                                          // instant du dernier changement de valeur
-unsigned long currentTime;                                        // instant de le mesure courante
-const unsigned long delayMs{1000};                                // délai de mesure en milliseconde
-const float k{(float)delayMs / ((float)numberOfBlades * 1000.0)}; // coefficient par lequel il faut multiplier le nombre de changements pour avoir la vitesse en tr/sec
+unsigned long lastTime;                                                    // instant de la dernière mesure du capteur
+unsigned long currentTime;                                                 // instant de le mesure courante du capteur
+const unsigned long delayMs{100};                                          // délai de mesure en milliseconde
+const float rpm{60000.0 / ((float)numberOfBlades * 2.0 * (float)delayMs)}; // coefficient par lequel il faut multiplier le nombre de changements pour avoir la vitesse en tr/min
 
-// valeurs lues sur le capteur old et new pour identifier les changements d'état
+// valeurs lues sur le capteur (HIGH ou LOW) ; old et new pour identifier les changements d'état
 int newValue;
 int oldValue;
 
 // vitesse mesurée du moteur
-float measuredSpeed; // vitesse du moteur en tr/min
-int motorDC{1};      // tension DC appliquée sur le moteur
+const int maxSpeed{6000}; // vitesse maximum du moteur
+float measuredSpeed;      // vitesse du moteur en tr/min
+float motorDC{0};         // tension DC appliquée sur le moteur pour obtenir une certaine vitesse
+
+// asservissement
+// coefficient proportionnel appliqué à la différence entre la consigne et la mesure et qui est rajoutée/enlevée à la tension du moteur
+const float fraction{1.0 / 2.0};                          // fraction de la différence entre consigne et mesure appliquée pour rattrapper la consigne
+const float factor{fraction * (254.0 / (float)maxSpeed)}; // cette fraction de vitesse 0 à maxSpeed est ramenée en fraction de commande moteur 0 à 254
 
 //=====================
 // Contrôles du moteur
@@ -36,12 +43,10 @@ inline void motorRun(int rate)
 }
 
 // Potentionmètre qui fixe la vitesse du moteur
-const uint8_t pinIN_Pot{4}; // pin pour la lecture du potentiomètre ; sa valeur fixe la vitesse du moteur 0 à 255
+const uint8_t pinIN_Pot{4}; // pin pour la lecture du potentiomètre ; sa valeur fixe la vitesse du moteur 0 à maxSpeed tr/min (0 à 1024)
 
 void setup()
 {
-  //Serial.begin(9600);
-
   // initialisation du lcd
   lcd.init();
   lcd.backlight();
@@ -51,8 +56,8 @@ void setup()
 
   // initialisation du capteur IR
   pinMode(pinIN_IRsensor, INPUT);
-  beginTime = micros(); // initialisation
-  oldValue = LOW;       // initialisation. L'état est supposé LOW au départ
+  lastTime = micros(); // initialisation
+  oldValue = LOW;      // initialisation. L'état est supposé LOW au départ
 
   // initialisation du moteur
   pinMode(pinPWM_Motor, OUTPUT);
@@ -60,11 +65,8 @@ void setup()
 
 void loop()
 {
-  // affichage de l'état du capteur : HAUT = détection ; BAS = pas de détection
-  //digitalRead(pinIN_IRsensor) == HIGH ? Serial.write("HAUT\n") : Serial.write("BAS\n");
-
-  // lecture du potentiomètre qui fixe la consigne de vitesse du moteur
-  int orderSpeed = map(analogRead(pinIN_Pot), 0, 1023, 0, 255);
+  // lecture du potentiomètre qui fixe la consigne de vitesse du moteur en tr/min
+  int orderSpeed = map(analogRead(pinIN_Pot), 0, 1023, 0, maxSpeed);
 
   // On incrémente un compteur durant le délai delayMs
   // Si on détecte un changement d'état du capteur on incrémente le compteur
@@ -77,28 +79,41 @@ void loop()
   }
 
   // quand le delai delayMs est atteint on affiche le résultat et on réinitialise le compteur
-  unsigned long d = currentTime - beginTime; // délai depuis le début du comptage
+  unsigned long d = currentTime - lastTime; // délai depuis le début du comptage
   if (d > delayMs)
   {
-    measuredSpeed = changeStateCounter * k;
+    measuredSpeed = changeStateCounter * rpm;
 
     // asservissement basique (mais perso !)
-    // on rattrape la consigne en injectant le 1/3 de la différence entre consigne et mesure
-    motorDC += (orderSpeed - measuredSpeed) / 2;
+    // on rattrape la consigne en injectant une fraction de la différence entre consigne et mesure
+
+    if (orderSpeed > measuredSpeed)
+    {
+      motorDC += (orderSpeed - measuredSpeed) * factor;
+      if (motorDC > 254)
+        motorDC = 254;
+    }
+    else
+    {
+      motorDC -= (measuredSpeed - orderSpeed) * factor;
+      if (motorDC < 0)
+        motorDC = 0;
+    }
 
     motorRun(motorDC);
 
-    beginTime = currentTime;
+    lastTime = currentTime;
     changeStateCounter = 0;
 
-    // Affichage de la consigne et de la vitesse
+    // Affichage de la consigne et de la vitesse sur le lcd
     // tous les delayMs également
-    lcd.clear();
     lcd.setCursor(0, 0); // ligne 0
     lcd.print("consigne :");
     lcd.print(orderSpeed);
+    lcd.print("      ");
     lcd.setCursor(0, 1); // ligne 1
     lcd.print("mesure   :");
     lcd.print(measuredSpeed);
+    lcd.print("      ");
   }
 }
