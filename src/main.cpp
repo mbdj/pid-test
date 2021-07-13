@@ -15,6 +15,9 @@
 #define PIN_pinIN_Pot PB3
 #define PIN_pinPWM_Motor PB1
 
+const long cpu_frequency{1000000}; // fréquence de l'ATTiny85
+const long ms{1000000 / cpu_frequency};
+
 // Ecran lcd pour afficher la consigne et la mesure de vitesse
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
@@ -30,7 +33,7 @@ const int numberOfBlades{4}; // nombre de pales du moteur sur lesquelles se réf
 
 unsigned long lastTime;                                                    // instant de la dernière mesure du capteur
 unsigned long currentTime;                                                 // instant de le mesure courante du capteur
-const unsigned long delayMs{500};                                          // délai de mesure en milliseconde
+const unsigned long delayMs{100 * ms};                                     // délai de mesure en milliseconde
 const float rpm{60000.0 / ((float)numberOfBlades * 2.0 * (float)delayMs)}; // coefficient par lequel il faut multiplier le nombre de changements pour avoir la vitesse en tr/min
 
 // valeurs lues sur le capteur (HIGH ou LOW) ; old et new pour identifier les changements d'état
