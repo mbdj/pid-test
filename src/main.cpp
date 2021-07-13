@@ -1,13 +1,28 @@
 #include <Arduino.h>
 
-// Ecran lcd
+// Asservissement d'un moteur CC avec un ATTiny85
+// Mehdi 13/07/2021
+
+// pin out ATTINY85
+//                      -----
+//               RESET-|1   8|-5V
+//  Pot >       A3-PB3-|2   7|-PB2-A1-SCL   > LCD SCL
+//  IRsensor >  A2-PB4-|3   6|-PB1-PWM      > Motor (via gate du mosfet)
+//                 GND-|4   5|-PB0-PWM-SDA  > LCD SDA
+//                      -----
+
+#define PIN_pinIN_IRsensor PB4
+#define PIN_pinIN_Pot PB3
+#define PIN_pinPWM_Motor PB1
+
+// Ecran lcd pour afficher la consigne et la mesure de vitesse
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
 LiquidCrystal_I2C lcd(0x27, 16, 2); // set the LCD address to 0x27 for a 16 chars and 2 line display
 
 // Capteur réflechissant TCRT5000
-const uint8_t pinIN_IRsensor{12};    // pin de lecture du capteur : HIGH si capte un objet réfléchissant à proximité sinon LOW
-unsigned long changeStateCounter{0}; // compteur du nombre de changements d'état du capteur afin de calculer la vitesse du moteur
+const uint8_t pinIN_IRsensor{PIN_pinIN_IRsensor}; // pin de lecture du capteur : HIGH si capte un objet réfléchissant à proximité sinon LOW
+unsigned long changeStateCounter{0};              // compteur du nombre de changements d'état du capteur afin de calculer la vitesse du moteur
 
 // hélice du moteur permettant de calculer sa vitesse
 const int numberOfBlades{4}; // nombre de pales du moteur sur lesquelles se réflechit la lumière du capteur
@@ -15,7 +30,7 @@ const int numberOfBlades{4}; // nombre de pales du moteur sur lesquelles se réf
 
 unsigned long lastTime;                                                    // instant de la dernière mesure du capteur
 unsigned long currentTime;                                                 // instant de le mesure courante du capteur
-const unsigned long delayMs{100};                                          // délai de mesure en milliseconde
+const unsigned long delayMs{500};                                          // délai de mesure en milliseconde
 const float rpm{60000.0 / ((float)numberOfBlades * 2.0 * (float)delayMs)}; // coefficient par lequel il faut multiplier le nombre de changements pour avoir la vitesse en tr/min
 
 // valeurs lues sur le capteur (HIGH ou LOW) ; old et new pour identifier les changements d'état
@@ -35,7 +50,7 @@ const float factor{fraction * (254.0 / (float)maxSpeed)}; // cette fraction de v
 //=====================
 // Contrôles du moteur
 //=====================
-const uint8_t pinPWM_Motor{3}; // pin contrôlant la vitesse du moteur par PWM (connecté à la gate du mosfet alimentant le moteur)
+const uint8_t pinPWM_Motor{PIN_pinPWM_Motor}; // pin contrôlant la vitesse du moteur par PWM (connecté à la gate du mosfet alimentant le moteur)
 
 inline void motorRun(int rate)
 {
@@ -43,7 +58,7 @@ inline void motorRun(int rate)
 }
 
 // Potentionmètre qui fixe la vitesse du moteur
-const uint8_t pinIN_Pot{4}; // pin pour la lecture du potentiomètre ; sa valeur fixe la vitesse du moteur 0 à maxSpeed tr/min (0 à 1024)
+const uint8_t pinIN_Pot{PIN_pinIN_Pot}; // pin pour la lecture du potentiomètre ; sa valeur fixe la vitesse du moteur 0 à maxSpeed tr/min (0 à 1024)
 
 void setup()
 {
