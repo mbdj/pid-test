@@ -1,8 +1,14 @@
 #include <Arduino.h>
 
-// Asservissement d'un moteur CC avec un ATTiny85
+// Asservissement d'un moteur CC
 // Mehdi 13/07/2021
 
+#define ATMEGA2560
+
+//====================
+// ATTINY85
+//====================
+//
 // pin out ATTINY85
 //                      -----
 //               RESET-|1   8|-5V
@@ -10,44 +16,60 @@
 //  IRsensor >  A2-PB4-|3   6|-PB1-PWM      > Motor (via gate du mosfet)
 //                 GND-|4   5|-PB0-PWM-SDA  > LCD SDA
 //                      -----
-
+#ifdef ATTINY85
 #define PIN_pinIN_IRsensor PB4
 #define PIN_pinIN_Pot PB3
 #define PIN_pinPWM_Motor PB1
 
 const long cpu_frequency{1000000}; // fréquence de l'ATTiny85
-const long ms{1000000 / cpu_frequency};
+const unsigned int ms{1000000 / cpu_frequency};
+#endif
+
+//====================
+// ATMEGA2560
+//====================
+#ifdef ATMEGA2560
+#define PIN_pinIN_IRsensor A0
+#define PIN_pinIN_Pot A1
+#define PIN_pinPWM_Motor 2
+const unsigned int ms{1};
+#endif
+
+unsigned int currentTime; // instant de le mesure courante du capteur
 
 // Ecran lcd pour afficher la consigne et la mesure de vitesse
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
 LiquidCrystal_I2C lcd(0x27, 16, 2); // set the LCD address to 0x27 for a 16 chars and 2 line display
+const int displayDelay{2000 * ms};  // délai d'affichage
+unsigned long lastTimeDisplay;
 
 // Capteur réflechissant TCRT5000
 const uint8_t pinIN_IRsensor{PIN_pinIN_IRsensor}; // pin de lecture du capteur : HIGH si capte un objet réfléchissant à proximité sinon LOW
-unsigned long changeStateCounter{0};              // compteur du nombre de changements d'état du capteur afin de calculer la vitesse du moteur
+unsigned int changeStateCounter{0};               // compteur du nombre de changements d'état du capteur afin de calculer la vitesse du moteur
 
 // hélice du moteur permettant de calculer sa vitesse
 const int numberOfBlades{4}; // nombre de pales du moteur sur lesquelles se réflechit la lumière du capteur
                              // pour chaque pale on a 2 changements d'état du capteur
 
-unsigned long lastTime;                                                    // instant de la dernière mesure du capteur
-unsigned long currentTime;                                                 // instant de le mesure courante du capteur
-const unsigned long delayMs{100 * ms};                                     // délai de mesure en milliseconde
-const float rpm{60000.0 / ((float)numberOfBlades * 2.0 * (float)delayMs)}; // coefficient par lequel il faut multiplier le nombre de changements pour avoir la vitesse en tr/min
+unsigned long lastTimeStateCounter;              // instant de la dernière mesure du capteur
+const unsigned long stateCounterDelay{600 * ms}; // délai de mesure en milliseconde
+// une boucle loop() fait environ 60 ms
+const float rpm{60000.0 / ((float)numberOfBlades * 2.0 * (float)stateCounterDelay)}; // coefficient par lequel il faut multiplier le nombre de changements pour avoir la vitesse en tr/min
 
 // valeurs lues sur le capteur (HIGH ou LOW) ; old et new pour identifier les changements d'état
-int newValue;
-int oldValue;
+int sensorNewValue;
+int sensorOldValue;
 
-// vitesse mesurée du moteur
-const int maxSpeed{6000}; // vitesse maximum du moteur
-float measuredSpeed;      // vitesse du moteur en tr/min
-float motorDC{0};         // tension DC appliquée sur le moteur pour obtenir une certaine vitesse
+// vitesses du moteur
+const float maxSpeed{6000.0}; // vitesse maximum du moteur en tr/min
+int measuredSpeed;            // vitesse du moteur en tr/min
+int motorDC{0};               // tension DC appliquée sur le moteur pour obtenir une certaine vitesse
+int orderSpeed{0};
 
 // asservissement
 // coefficient proportionnel appliqué à la différence entre la consigne et la mesure et qui est rajoutée/enlevée à la tension du moteur
-const float fraction{1.0 / 2.0};                          // fraction de la différence entre consigne et mesure appliquée pour rattrapper la consigne
+const float fraction{1.0 / 3.0};                          // fraction de la différence entre consigne et mesure appliquée pour rattrapper la consigne
 const float factor{fraction * (254.0 / (float)maxSpeed)}; // cette fraction de vitesse 0 à maxSpeed est ramenée en fraction de commande moteur 0 à 254
 
 //=====================
@@ -55,7 +77,7 @@ const float factor{fraction * (254.0 / (float)maxSpeed)}; // cette fraction de v
 //=====================
 const uint8_t pinPWM_Motor{PIN_pinPWM_Motor}; // pin contrôlant la vitesse du moteur par PWM (connecté à la gate du mosfet alimentant le moteur)
 
-inline void motorRun(int rate)
+inline void motorRun(uint8_t rate)
 {
   analogWrite(pinPWM_Motor, rate);
 }
@@ -63,8 +85,12 @@ inline void motorRun(int rate)
 // Potentionmètre qui fixe la vitesse du moteur
 const uint8_t pinIN_Pot{PIN_pinIN_Pot}; // pin pour la lecture du potentiomètre ; sa valeur fixe la vitesse du moteur 0 à maxSpeed tr/min (0 à 1024)
 
+//=========
+// setup()
+//=========
 void setup()
 {
+  Serial.begin(9600);
   // initialisation du lcd
   lcd.init();
   lcd.backlight();
@@ -74,36 +100,42 @@ void setup()
 
   // initialisation du capteur IR
   pinMode(pinIN_IRsensor, INPUT);
-  lastTime = micros(); // initialisation
-  oldValue = LOW;      // initialisation. L'état est supposé LOW au départ
+  sensorOldValue = LOW; // initialisation. L'état est LOW au départ
 
   // initialisation du moteur
   pinMode(pinPWM_Motor, OUTPUT);
+
+  lastTimeDisplay = lastTimeStateCounter = millis(); // initialisation des instants de mesure
 }
 
+//========
+// loop()
+//========
 void loop()
 {
-  // lecture du potentiomètre qui fixe la consigne de vitesse du moteur en tr/min
-  int orderSpeed = map(analogRead(pinIN_Pot), 0, 1023, 0, maxSpeed);
+  currentTime = millis();
+  unsigned long currentStateCounterDelay = currentTime - lastTimeStateCounter; // délai depuis le début du comptage
+  unsigned long currentDisplayDelay = currentTime - lastTimeDisplay;
 
   // On incrémente un compteur durant le délai delayMs
   // Si on détecte un changement d'état du capteur on incrémente le compteur
-  currentTime = millis();
-  newValue = digitalRead(pinIN_IRsensor);
-  if (newValue != oldValue)
+  sensorNewValue = digitalRead(pinIN_IRsensor);
+  if (sensorNewValue != sensorOldValue)
   {
     changeStateCounter++;
-    oldValue = newValue;
+    sensorOldValue = sensorNewValue;
   }
 
   // quand le delai delayMs est atteint on affiche le résultat et on réinitialise le compteur
-  unsigned long d = currentTime - lastTime; // délai depuis le début du comptage
-  if (d > delayMs)
+  if (currentStateCounterDelay >= stateCounterDelay)
   {
     measuredSpeed = changeStateCounter * rpm;
 
     // asservissement basique (mais perso !)
     // on rattrape la consigne en injectant une fraction de la différence entre consigne et mesure
+
+    // lecture du potentiomètre qui fixe la consigne de vitesse du moteur en tr/min
+    orderSpeed = map(analogRead(pinIN_Pot), 0, 1023, 0, maxSpeed);
 
     if (orderSpeed > measuredSpeed)
     {
@@ -111,7 +143,7 @@ void loop()
       if (motorDC > 254)
         motorDC = 254;
     }
-    else
+    else if (orderSpeed < measuredSpeed)
     {
       motorDC -= (measuredSpeed - orderSpeed) * factor;
       if (motorDC < 0)
@@ -120,11 +152,14 @@ void loop()
 
     motorRun(motorDC);
 
-    lastTime = currentTime;
     changeStateCounter = 0;
+    lastTimeStateCounter = millis();
+  }
 
+  // affichage si displayDelay atteint
+  if (currentDisplayDelay >= displayDelay)
+  {
     // Affichage de la consigne et de la vitesse sur le lcd
-    // tous les delayMs également
     lcd.setCursor(0, 0); // ligne 0
     lcd.print("consigne :");
     lcd.print(orderSpeed);
@@ -133,5 +168,7 @@ void loop()
     lcd.print("mesure   :");
     lcd.print(measuredSpeed);
     lcd.print("      ");
+
+    lastTimeDisplay = currentTime;
   }
 }
