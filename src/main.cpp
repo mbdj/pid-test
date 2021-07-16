@@ -3,7 +3,8 @@
 // Asservissement d'un moteur CC
 // Mehdi 13/07/2021
 
-#define ATMEGA2560
+//#define ATMEGA2560
+#define ATTINY85
 
 //====================
 // ATTINY85
@@ -41,7 +42,7 @@ unsigned int currentTime; // instant de le mesure courante du capteur
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
 LiquidCrystal_I2C lcd(0x27, 16, 2); // set the LCD address to 0x27 for a 16 chars and 2 line display
-const int displayDelay{2000 * ms};  // délai d'affichage
+const int displayDelay{1000 * ms};  // délai d'affichage
 unsigned long lastTimeDisplay;
 
 // Capteur réflechissant TCRT5000
@@ -53,7 +54,7 @@ const int numberOfBlades{4}; // nombre de pales du moteur sur lesquelles se réf
                              // pour chaque pale on a 2 changements d'état du capteur
 
 unsigned long lastTimeStateCounter;              // instant de la dernière mesure du capteur
-const unsigned long stateCounterDelay{600 * ms}; // délai de mesure en milliseconde
+const unsigned long stateCounterDelay{1000 * ms}; // délai de mesure en milliseconde
 // une boucle loop() fait environ 60 ms
 const float rpm{60000.0 / ((float)numberOfBlades * 2.0 * (float)stateCounterDelay)}; // coefficient par lequel il faut multiplier le nombre de changements pour avoir la vitesse en tr/min
 
@@ -69,7 +70,7 @@ int orderSpeed{0};
 
 // asservissement
 // coefficient proportionnel appliqué à la différence entre la consigne et la mesure et qui est rajoutée/enlevée à la tension du moteur
-const float fraction{1.0 / 3.0};                          // fraction de la différence entre consigne et mesure appliquée pour rattrapper la consigne
+const float fraction{1.0 / 2.0};                          // fraction de la différence entre consigne et mesure appliquée pour rattrapper la consigne
 const float factor{fraction * (254.0 / (float)maxSpeed)}; // cette fraction de vitesse 0 à maxSpeed est ramenée en fraction de commande moteur 0 à 254
 
 //=====================
