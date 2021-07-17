@@ -3,6 +3,7 @@
 // Asservissement d'un moteur CC
 // Mehdi 13/07/2021
 
+// choix du microcontrôleur cible
 //#define ATMEGA2560
 #define ATTINY85
 
@@ -91,7 +92,6 @@ const uint8_t pinIN_Pot{PIN_pinIN_Pot}; // pin pour la lecture du potentiomètre
 //=========
 void setup()
 {
-  Serial.begin(9600);
   // initialisation du lcd
   lcd.init();
   lcd.backlight();
