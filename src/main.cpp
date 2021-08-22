@@ -57,7 +57,7 @@ const int numberOfBlades{4}; // nombre de pales du moteur sur lesquelles se réf
 unsigned long lastTimeStateCounter;               // instant de la dernière mesure du capteur
 const unsigned long stateCounterDelay{1000 * ms}; // délai de mesure en milliseconde
 
-const float k{60000.0 / (((float)numberOfBlades * 2.0) + 1.0)}; // coefficient pré-calculé ppur le calcul de la vitesse en tr/min
+const float k{60000.0 / (((float)numberOfBlades * 2.0) + 1.0)}; // coefficient pré-calculé pour le calcul de la vitesse en tr/min
 
 // valeurs lues sur le capteur (HIGH ou LOW) ; old et new pour identifier les changements d'état
 int sensorNewValue;
