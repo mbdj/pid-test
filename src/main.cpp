@@ -54,10 +54,10 @@ unsigned int changeStateCounter{0};               // compteur du nombre de chang
 const int numberOfBlades{4}; // nombre de pales du moteur sur lesquelles se réflechit la lumière du capteur
                              // pour chaque pale on a 2 changements d'état du capteur
 
-unsigned long lastTimeStateCounter;              // instant de la dernière mesure du capteur
+unsigned long lastTimeStateCounter;               // instant de la dernière mesure du capteur
 const unsigned long stateCounterDelay{1000 * ms}; // délai de mesure en milliseconde
-// une boucle loop() fait environ 60 ms
-const float rpm{60000.0 / ((float)numberOfBlades * 2.0 * (float)stateCounterDelay)}; // coefficient par lequel il faut multiplier le nombre de changements pour avoir la vitesse en tr/min
+
+const float k{60000.0 / (((float)numberOfBlades * 2.0) + 1.0)}; // coefficient pré-calculé ppur le calcul de la vitesse en tr/min
 
 // valeurs lues sur le capteur (HIGH ou LOW) ; old et new pour identifier les changements d'état
 int sensorNewValue;
@@ -130,7 +130,7 @@ void loop()
   // quand le delai delayMs est atteint on affiche le résultat et on réinitialise le compteur
   if (currentStateCounterDelay >= stateCounterDelay)
   {
-    measuredSpeed = changeStateCounter * rpm;
+    measuredSpeed = k * ((float)changeStateCounter / ((float)currentStateCounterDelay));
 
     // asservissement basique (mais perso !)
     // on rattrape la consigne en injectant une fraction de la différence entre consigne et mesure
