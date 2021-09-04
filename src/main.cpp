@@ -43,7 +43,7 @@ unsigned int currentTime; // instant de le mesure courante du capteur
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
 LiquidCrystal_I2C lcd(0x27, 16, 2); // set the LCD address to 0x27 for a 16 chars and 2 line display
-const int displayDelay{1000 * ms};  // délai d'affichage
+const int displayDelay{1000 * ms};   // délai d'affichage
 unsigned long lastTimeDisplay;
 
 // Capteur réflechissant TCRT5000
@@ -57,22 +57,23 @@ const int numberOfBlades{4}; // nombre de pales du moteur sur lesquelles se réf
 unsigned long lastTimeStateCounter;              // instant de la dernière mesure du capteur
 const unsigned long stateCounterDelay{1000 * ms}; // délai de mesure en milliseconde
 // une boucle loop() fait environ 60 ms
-const float rpm{60000.0 / ((float)numberOfBlades * 2.0 * (float)stateCounterDelay)}; // coefficient par lequel il faut multiplier le nombre de changements pour avoir la vitesse en tr/min
+//const float rpm{60000.0 / (((float)numberOfBlades * 2.0 + 1.0) * (float)stateCounterDelay)}; // coefficient par lequel il faut multiplier le nombre de changements pour avoir la vitesse en tr/min
+const float k{60000.0 / (((float)numberOfBlades * 2.0) + 1.0)};
 
 // valeurs lues sur le capteur (HIGH ou LOW) ; old et new pour identifier les changements d'état
 int sensorNewValue;
 int sensorOldValue;
 
 // vitesses du moteur
-const float maxSpeed{6000.0}; // vitesse maximum du moteur en tr/min
-int measuredSpeed;            // vitesse du moteur en tr/min
-int motorDC{0};               // tension DC appliquée sur le moteur pour obtenir une certaine vitesse
+const float maxSpeed{8000}; // vitesse maximum du moteur en tr/min
+int measuredSpeed;          // vitesse du moteur en tr/min
+int motorDC{0};             // tension DC appliquée sur le moteur pour obtenir une certaine vitesse
 int orderSpeed{0};
 
 // asservissement
 // coefficient proportionnel appliqué à la différence entre la consigne et la mesure et qui est rajoutée/enlevée à la tension du moteur
-const float fraction{1.0 / 2.0};                          // fraction de la différence entre consigne et mesure appliquée pour rattrapper la consigne
-const float factor{fraction * (254.0 / (float)maxSpeed)}; // cette fraction de vitesse 0 à maxSpeed est ramenée en fraction de commande moteur 0 à 254
+const float fraction{1.0 / 2.0};                   // fraction de la différence entre consigne et mesure appliquée pour rattrapper la consigne
+const float factor{fraction * (255.0 / maxSpeed)}; // cette fraction de vitesse 0 à maxSpeed est ramenée en fraction de commande moteur 0 à 254
 
 //=====================
 // Contrôles du moteur
@@ -130,8 +131,9 @@ void loop()
   // quand le delai delayMs est atteint on affiche le résultat et on réinitialise le compteur
   if (currentStateCounterDelay >= stateCounterDelay)
   {
-    measuredSpeed = changeStateCounter * rpm;
+    //measuredSpeed = changeStateCounter * rpm;
 
+    measuredSpeed = k * ((float)changeStateCounter / ((float)currentStateCounterDelay));
     // asservissement basique (mais perso !)
     // on rattrape la consigne en injectant une fraction de la différence entre consigne et mesure
 
@@ -141,10 +143,10 @@ void loop()
     if (orderSpeed > measuredSpeed)
     {
       motorDC += (orderSpeed - measuredSpeed) * factor;
-      if (motorDC > 254)
-        motorDC = 254;
+      if (motorDC > 255)
+        motorDC = 255;
     }
-    else if (orderSpeed < measuredSpeed)
+    else //if (orderSpeed < measuredSpeed)
     {
       motorDC -= (measuredSpeed - orderSpeed) * factor;
       if (motorDC < 0)
