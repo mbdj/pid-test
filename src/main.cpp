@@ -56,8 +56,8 @@ const int numberOfBlades{4}; // nombre de pales du moteur sur lesquelles se réf
 
 unsigned long lastTimeStateCounter;               // instant de la dernière mesure du capteur
 const unsigned long stateCounterDelay{1000 * ms}; // délai de mesure en milliseconde
-// une boucle loop() fait environ 60 ms
-//const float rpm{60000.0 / (((float)numberOfBlades * 2.0 + 1.0) * (float)stateCounterDelay)}; // coefficient par lequel il faut multiplier le nombre de changements pour avoir la vitesse en tr/min
+// NB : une boucle loop() fait environ 60 ms
+
 const float k{60000.0 / (((float)numberOfBlades * 2.0) + 1.0)};
 
 // valeurs lues sur le capteur (HIGH ou LOW) ; old et new pour identifier les changements d'état
@@ -131,10 +131,8 @@ void loop()
   // quand le delai delayMs est atteint on affiche le résultat et on réinitialise le compteur
   if (currentStateCounterDelay >= stateCounterDelay)
   {
-    //measuredSpeed = changeStateCounter * rpm;
-
     measuredSpeed = k * ((float)changeStateCounter / ((float)currentStateCounterDelay));
-    // asservissement basique (mais perso !)
+    // asservissement basique
     // on rattrape la consigne en injectant une fraction de la différence entre consigne et mesure
 
     // lecture du potentiomètre qui fixe la consigne de vitesse du moteur en tr/min
