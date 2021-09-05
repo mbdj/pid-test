@@ -12,3 +12,4 @@ microcontroleur ATTINY85 :
                  GND-|4   5|-PB0-PWM-SDA  > LCD SDA
                       -----
 
+Voir Schematic_Asservissement ATTiny85_2021-09-05.svg
