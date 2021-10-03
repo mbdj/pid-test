@@ -3,10 +3,8 @@
 //#include <Wire.h>
 #include <U8x8lib.h> // bibliothèque pour l'écran OLED
 
-//#include <LiquidCrystal_I2C.h>
-
 // Asservissement d'un moteur CC
-// Mehdi 05/09/2021
+// Mehdi 03/10/2021
 
 // choix du microcontrôleur cible
 //#define ATMEGA2560
@@ -44,14 +42,10 @@ const unsigned int ms{1};
 
 unsigned long currentTime; // instant de le mesure courante du capteur
 
-// Ecran lcd pour afficher la consigne et la mesure de vitesse
-
-//LiquidCrystal_I2C lcd(0x27, 16, 2); // set the LCD address to 0x27 for a 16 chars and 2 line display
-
 // Ecran OLED
-U8X8_SH1106_128X64_NONAME_HW_I2C OLED(U8X8_PIN_NONE); //, SCL, SDA); // reset, clock, data
+U8X8_SSD1306_128X64_NONAME_SW_I2C oled(SCL, SDA, /* reset=*/U8X8_PIN_NONE);
 
-const int displayDelay{2000 * ms}; // délai d'affichage. nb : on affiche peu souvent car l'affichage dure environ 1/3 s !
+const int displayDelay{2000 * ms}; // délai d'affichage. nb : on affiche peu souvent car l'affichage est très long
 unsigned long lastTimeDisplay;
 
 // Capteur réflechissant TCRT5000
@@ -108,13 +102,14 @@ unsigned long beginLoop;
 //=========
 void setup()
 {
-  // initialisation du lcd
-  //lcd.init();
-  //lcd.backlight();
-
   // initialisation de l'écran OLED
-  OLED.begin();
-  OLED.setPowerSave(0);
+  oled.begin();
+  //oled.setPowerSave(0);
+  oled.setFont(u8x8_font_chroma48medium8_r);
+
+  oled.drawString(0, 0, "Asservissement");
+  oled.drawString(0, 2, "consigne :");
+  oled.drawString(0, 3, "mesure   :");
 
   // initialisation du potentiomètre
   pinMode(pinIN_Pot, INPUT);
@@ -136,10 +131,6 @@ void setup()
 //========
 void loop()
 {
-  OLED.setFont(u8x8_font_chroma48medium8_r);
-  OLED.drawString(0, 1, "Hello World!");
-  OLED.refreshDisplay();
-
   // Si on détecte un changement d'état du capteur on incrémente le compteur
   sensorNewValue = digitalRead(pinIN_IRsensor);
   if (sensorNewValue != sensorOldValue)
@@ -185,19 +176,18 @@ void loop()
   currentDisplayDelay = currentTime - lastTimeDisplay;
   if (currentDisplayDelay >= displayDelay)
   {
-    // Affichage de la consigne et de la vitesse sur le lcd
-    //lcd.setCursor(0, 0); // ligne 0
-    //lcd.print("consigne :");
-    //lcd.print(orderSpeed);
-    //lcd.print("      ");
-    //lcd.setCursor(0, 1); // ligne 1
-    //lcd.print("mesure   :");
-    //lcd.print(measuredSpeed);
-    //lcd.print("      ");
+
+    char consigne[5]; // 4 car + 0 de fin de string
+    sprintf(consigne, "%4d", orderSpeed);
+    oled.drawString(12, 2, consigne);
+
+    char mesure[5];
+    sprintf(mesure, "%4d", measuredSpeed);
+    oled.drawString(12, 3, mesure);
 
     lastTimeDisplay = currentTime;
 
-    // après un affichage qui est très long (276 ms) on remet le compteur à zéro pour recommencer le comptage après l'affichage et ne pas fausser la mesure
+    // après un affichage qui est très long on remet le compteur à zéro pour recommencer le comptage après l'affichage et ne pas fausser la mesure
     // sinon on va rater le comptage des changements d'états pendant près de 1/3 sec
     changeStateCounter = 0;
     lastTimeStateCounter = millis();
