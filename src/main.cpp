@@ -1,5 +1,10 @@
 #include <Arduino.h>
 
+//#include <Wire.h>
+#include <U8x8lib.h> // bibliothèque pour l'écran OLED
+
+//#include <LiquidCrystal_I2C.h>
+
 // Asservissement d'un moteur CC
 // Mehdi 05/09/2021
 
@@ -40,10 +45,13 @@ const unsigned int ms{1};
 unsigned long currentTime; // instant de le mesure courante du capteur
 
 // Ecran lcd pour afficher la consigne et la mesure de vitesse
-#include <Wire.h>
-#include <LiquidCrystal_I2C.h>
-LiquidCrystal_I2C lcd(0x27, 16, 2); // set the LCD address to 0x27 for a 16 chars and 2 line display
-const int displayDelay{2000 * ms};  // délai d'affichage. nb : on affiche peu souvent car l'affichage dure environ 1/3 s !
+
+//LiquidCrystal_I2C lcd(0x27, 16, 2); // set the LCD address to 0x27 for a 16 chars and 2 line display
+
+// Ecran OLED
+U8X8_SH1106_128X64_NONAME_HW_I2C OLED(U8X8_PIN_NONE); //, SCL, SDA); // reset, clock, data
+
+const int displayDelay{2000 * ms}; // délai d'affichage. nb : on affiche peu souvent car l'affichage dure environ 1/3 s !
 unsigned long lastTimeDisplay;
 
 // Capteur réflechissant TCRT5000
@@ -101,8 +109,12 @@ unsigned long beginLoop;
 void setup()
 {
   // initialisation du lcd
-  lcd.init();
-  lcd.backlight();
+  //lcd.init();
+  //lcd.backlight();
+
+  // initialisation de l'écran OLED
+  OLED.begin();
+  OLED.setPowerSave(0);
 
   // initialisation du potentiomètre
   pinMode(pinIN_Pot, INPUT);
@@ -124,6 +136,10 @@ void setup()
 //========
 void loop()
 {
+  OLED.setFont(u8x8_font_chroma48medium8_r);
+  OLED.drawString(0, 1, "Hello World!");
+  OLED.refreshDisplay();
+
   // Si on détecte un changement d'état du capteur on incrémente le compteur
   sensorNewValue = digitalRead(pinIN_IRsensor);
   if (sensorNewValue != sensorOldValue)
@@ -170,14 +186,14 @@ void loop()
   if (currentDisplayDelay >= displayDelay)
   {
     // Affichage de la consigne et de la vitesse sur le lcd
-    lcd.setCursor(0, 0); // ligne 0
-    lcd.print("consigne :");
-    lcd.print(orderSpeed);
-    lcd.print("      ");
-    lcd.setCursor(0, 1); // ligne 1
-    lcd.print("mesure   :");
-    lcd.print(measuredSpeed);
-    lcd.print("      ");
+    //lcd.setCursor(0, 0); // ligne 0
+    //lcd.print("consigne :");
+    //lcd.print(orderSpeed);
+    //lcd.print("      ");
+    //lcd.setCursor(0, 1); // ligne 1
+    //lcd.print("mesure   :");
+    //lcd.print(measuredSpeed);
+    //lcd.print("      ");
 
     lastTimeDisplay = currentTime;
 
