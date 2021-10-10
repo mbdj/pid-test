@@ -25,9 +25,6 @@
 #define PIN_pinIN_IRsensor PB4
 #define PIN_pinIN_Pot PB3
 #define PIN_pinPWM_Motor PB1
-
-const long cpu_frequency{1000000}; // fréquence de l'ATTiny85
-const unsigned int ms{1000000 / cpu_frequency};
 #endif
 
 //====================
@@ -37,7 +34,6 @@ const unsigned int ms{1000000 / cpu_frequency};
 #define PIN_pinIN_IRsensor A0
 #define PIN_pinIN_Pot A1
 #define PIN_pinPWM_Motor 2
-const unsigned int ms{1};
 #endif
 
 unsigned long currentTime; // instant de le mesure courante du capteur
@@ -45,7 +41,7 @@ unsigned long currentTime; // instant de le mesure courante du capteur
 // Ecran OLED
 U8X8_SSD1306_128X64_NONAME_SW_I2C oled(SCL, SDA, /* reset=*/U8X8_PIN_NONE);
 
-const int displayDelay{2000 * ms}; // délai d'affichage. nb : on affiche peu souvent car l'affichage est très long
+const int displayDelay{1000}; // délai d'affichage. nb : on affiche peu souvent car l'affichage est très long
 unsigned long lastTimeDisplay;
 
 // Capteur réflechissant TCRT5000
@@ -56,8 +52,8 @@ unsigned long changeStateCounter{0};              // compteur du nombre de chang
 const int numberOfBlades{4}; // nombre de pales du moteur sur lesquelles se réflechit la lumière du capteur
                              // pour chaque pale on a 2 changements d'état du capteur
 
-unsigned long lastTimeStateCounter;              // instant de la dernière mesure du capteur
-const unsigned long stateCounterDelay{100 * ms}; // délai de mesure en milliseconde
+unsigned long lastTimeStateCounter;        // instant de la dernière mesure du capteur
+const unsigned long stateCounterDelay{100}; // délai de mesure en milliseconde
 // nb : une boucle loop() fait 160us pour le comptage, 2 ms pour l'asservissement et environ 276 ms pour l'affichage lcd !
 
 // valeurs lues sur le capteur (HIGH ou LOW) ; old et new pour identifier les changements d'état
