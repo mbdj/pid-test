@@ -7,6 +7,7 @@
 // Mehdi 16/10/2021
 
 // On introduit un seuil epsilon destiné à éviter les variations intempestives
+// nb : après test çà n'améliore pas la précision
 
 // choix du microcontrôleur cible
 //#define ATMEGA2560
@@ -43,7 +44,7 @@ unsigned long currentTime; // instant de le mesure courante du capteur
 // Ecran OLED
 U8X8_SSD1306_128X64_NONAME_SW_I2C oled(SCL, SDA, /* reset=*/U8X8_PIN_NONE);
 
-const int displayDelay{1000}; // délai d'affichage. nb : on affiche peu souvent car l'affichage est très long
+const int displayDelay{500}; // délai d'affichage. nb : on affiche peu souvent car l'affichage est très long
 unsigned long lastTimeDisplay;
 
 // Capteur réflechissant TCRT5000
@@ -93,7 +94,9 @@ inline void motorRun(uint8_t rate)
 // Potentiomètre qui fixe la vitesse du moteur
 const uint8_t pinIN_Pot{PIN_pinIN_Pot}; // pin pour la lecture du potentiomètre ; sa valeur fixe la vitesse du moteur 0 à maxSpeed tr/min (0 à 1024)
 
-const int epsilon = maxSpeed * 0.01;
+// la constant epsilon fixe le seuil de part et d'autre de la consigne en dessous duquel on de modifie pas la dernière consigne
+// pour éviter les fluctuations inutiles autour de la consigne
+const int epsilon = 0; //maxSpeed * 0.01;
 
 //=========
 // setup()
@@ -105,10 +108,11 @@ void setup()
   // oled.setPowerSave(0);
   oled.setFont(u8x8_font_chroma48medium8_r);
 
-  oled.drawString(0, 0, "Asservissement");
+  oled.drawString(0, 0, "ASSERVISSEMENT");
   oled.drawString(0, 2, "consigne :");
   oled.drawString(0, 3, "mesure   :");
   oled.drawString(0, 4, "erreur (%) :");
+  oled.drawString(0, 5, "commande (%) :");
 
   // initialisation du potentiomètre
   pinMode(pinIN_Pot, INPUT);
@@ -152,6 +156,7 @@ void loop()
     // lecture du potentiomètre qui fixe la consigne de vitesse du moteur en tr/min
     orderSpeed = analogRead(pinIN_Pot) * maxSpeed / 1023;
 
+    // la constante epsilon crée un effet d'hysteresys qui évite les variations autour de la consigne
     if (orderSpeed > measuredSpeed + epsilon)
     {
       motorDC += (orderSpeed - measuredSpeed) * factor;
@@ -184,8 +189,11 @@ void loop()
     sprintf(str, "%4d", measuredSpeed);
     oled.drawString(12, 3, str);
 
-    sprintf(str, "%4d", (orderSpeed - measuredSpeed) / orderSpeed);
+    sprintf(str, "%4d", 100 * (orderSpeed - measuredSpeed) / orderSpeed);
     oled.drawString(12, 4, str);
+
+    sprintf(str, "%4d", 100 * motorDC / 255);
+    oled.drawString(12, 5, str);
 
     lastTimeDisplay = currentTime;
 
