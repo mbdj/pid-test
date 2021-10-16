@@ -4,7 +4,9 @@
 #include <U8x8lib.h> // bibliothèque pour l'écran OLED
 
 // Asservissement d'un moteur CC
-// Mehdi 03/10/2021
+// Mehdi 16/10/2021
+
+// On introduit un seuil epsilon destiné à éviter les variations intempestives
 
 // choix du microcontrôleur cible
 //#define ATMEGA2560
@@ -52,7 +54,7 @@ unsigned long changeStateCounter{0};              // compteur du nombre de chang
 const int numberOfBlades{4}; // nombre de pales du moteur sur lesquelles se réflechit la lumière du capteur
                              // pour chaque pale on a 2 changements d'état du capteur
 
-unsigned long lastTimeStateCounter;        // instant de la dernière mesure du capteur
+unsigned long lastTimeStateCounter;         // instant de la dernière mesure du capteur
 const unsigned long stateCounterDelay{100}; // délai de mesure en milliseconde
 // nb : une boucle loop() fait 160us pour le comptage, 2 ms pour l'asservissement et environ 276 ms pour l'affichage lcd !
 
@@ -91,7 +93,7 @@ inline void motorRun(uint8_t rate)
 // Potentiomètre qui fixe la vitesse du moteur
 const uint8_t pinIN_Pot{PIN_pinIN_Pot}; // pin pour la lecture du potentiomètre ; sa valeur fixe la vitesse du moteur 0 à maxSpeed tr/min (0 à 1024)
 
-unsigned long beginLoop;
+const int epsilon = maxSpeed * 0.01;
 
 //=========
 // setup()
@@ -100,12 +102,13 @@ void setup()
 {
   // initialisation de l'écran OLED
   oled.begin();
-  //oled.setPowerSave(0);
+  // oled.setPowerSave(0);
   oled.setFont(u8x8_font_chroma48medium8_r);
 
   oled.drawString(0, 0, "Asservissement");
   oled.drawString(0, 2, "consigne :");
   oled.drawString(0, 3, "mesure   :");
+  oled.drawString(0, 4, "erreur (%) :");
 
   // initialisation du potentiomètre
   pinMode(pinIN_Pot, INPUT);
@@ -142,19 +145,20 @@ void loop()
   if (currentStateCounterDelay >= stateCounterDelay)
   {
     measuredSpeed = coeffCalculVitesse * ((float)changeStateCounter / ((float)currentStateCounterDelay));
-    // asservissement proportionnel
-    // on rattrape la consigne en injectant une fraction de la différence entre consigne et mesure
+    // asservissement
+
+    // on rattrape la consigne en injectant une fraction de la différence entre consigne et mesure (erreur)
 
     // lecture du potentiomètre qui fixe la consigne de vitesse du moteur en tr/min
     orderSpeed = analogRead(pinIN_Pot) * maxSpeed / 1023;
 
-    if (orderSpeed > measuredSpeed)
+    if (orderSpeed > measuredSpeed + epsilon)
     {
       motorDC += (orderSpeed - measuredSpeed) * factor;
       if (motorDC > 255)
         motorDC = 255;
     }
-    else if (orderSpeed < measuredSpeed)
+    else if (orderSpeed < measuredSpeed - epsilon)
     {
       motorDC -= (measuredSpeed - orderSpeed) * factor;
       if (motorDC < 0)
@@ -173,13 +177,15 @@ void loop()
   if (currentDisplayDelay >= displayDelay)
   {
 
-    char consigne[5]; // 4 car + 0 de fin de string
-    sprintf(consigne, "%4d", orderSpeed);
-    oled.drawString(12, 2, consigne);
+    char str[5]; // 4 car + 0 de fin de string
+    sprintf(str, "%4d", orderSpeed);
+    oled.drawString(12, 2, str);
 
-    char mesure[5];
-    sprintf(mesure, "%4d", measuredSpeed);
-    oled.drawString(12, 3, mesure);
+    sprintf(str, "%4d", measuredSpeed);
+    oled.drawString(12, 3, str);
+
+    sprintf(str, "%4d", (orderSpeed - measuredSpeed) / orderSpeed);
+    oled.drawString(12, 4, str);
 
     lastTimeDisplay = currentTime;
 
