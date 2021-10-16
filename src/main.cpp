@@ -143,13 +143,11 @@ void loop()
   {
     measuredSpeed = coeffCalculVitesse * ((float)changeStateCounter / ((float)currentStateCounterDelay));
     // asservissement
-
     // on rattrape la consigne en injectant une fraction de la différence entre consigne et mesure (erreur)
 
     // lecture du potentiomètre qui fixe la consigne de vitesse du moteur en tr/min
     orderSpeed = analogRead(pinIN_Pot) * maxSpeed / 1023;
 
-    // la constante epsilon crée un effet d'hysteresys qui évite les variations autour de la consigne
     if (orderSpeed > measuredSpeed)
     {
       motorDC += (orderSpeed - measuredSpeed) * factor;
