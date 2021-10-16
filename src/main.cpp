@@ -6,9 +6,6 @@
 // Asservissement d'un moteur CC
 // Mehdi 16/10/2021
 
-// On introduit un seuil epsilon destiné à éviter les variations intempestives
-// nb : après test çà n'améliore pas la précision
-
 // choix du microcontrôleur cible
 //#define ATMEGA2560
 #define ATTINY85
@@ -94,10 +91,6 @@ inline void motorRun(uint8_t rate)
 // Potentiomètre qui fixe la vitesse du moteur
 const uint8_t pinIN_Pot{PIN_pinIN_Pot}; // pin pour la lecture du potentiomètre ; sa valeur fixe la vitesse du moteur 0 à maxSpeed tr/min (0 à 1024)
 
-// la constant epsilon fixe le seuil de part et d'autre de la consigne en dessous duquel on de modifie pas la dernière consigne
-// pour éviter les fluctuations inutiles autour de la consigne
-const int epsilon = 0; //maxSpeed * 0.01;
-
 //=========
 // setup()
 //=========
@@ -157,13 +150,13 @@ void loop()
     orderSpeed = analogRead(pinIN_Pot) * maxSpeed / 1023;
 
     // la constante epsilon crée un effet d'hysteresys qui évite les variations autour de la consigne
-    if (orderSpeed > measuredSpeed + epsilon)
+    if (orderSpeed > measuredSpeed)
     {
       motorDC += (orderSpeed - measuredSpeed) * factor;
       if (motorDC > 255)
         motorDC = 255;
     }
-    else if (orderSpeed < measuredSpeed - epsilon)
+    else if (orderSpeed < measuredSpeed)
     {
       motorDC -= (measuredSpeed - orderSpeed) * factor;
       if (motorDC < 0)
@@ -192,13 +185,13 @@ void loop()
     sprintf(str, "%4d", 100 * (orderSpeed - measuredSpeed) / orderSpeed);
     oled.drawString(12, 4, str);
 
-    sprintf(str, "%4d", 100 * motorDC / 255);
+    sprintf(str, "%3d", 100 * motorDC / 255);
     oled.drawString(12, 5, str);
 
     lastTimeDisplay = currentTime;
 
-    // après un affichage qui est très long on remet le compteur à zéro pour recommencer le comptage après l'affichage et ne pas fausser la mesure
-    // sinon on va rater le comptage des changements d'états pendant près de 1/3 sec
+    // après un affichage qui est long on remet le compteur à zéro pour recommencer le comptage après l'affichage et ne pas fausser la mesure
+    // sinon on va rater le comptage des changements d'états pendant l'affichage
     changeStateCounter = 0;
     lastTimeStateCounter = millis();
   }
