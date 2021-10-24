@@ -102,10 +102,10 @@ void setup()
   oled.setFont(u8x8_font_chroma48medium8_r);
 
   oled.drawString(0, 0, "ASSERVISSEMENT");
-  oled.drawString(0, 2, "consigne :");
-  oled.drawString(0, 3, "mesure   :");
-  oled.drawString(0, 4, "erreur (%) :");
-  oled.drawString(0, 5, "commande (%) :");
+  oled.drawString(0, 2, "consigne");
+  oled.drawString(0, 3, "mesure");
+  oled.drawString(0, 4, "\% erreur");
+  oled.drawString(0, 5, "\% commande");
 
   // initialisation du potentiomètre
   pinMode(pinIN_Pot, INPUT);
@@ -172,7 +172,6 @@ void loop()
   currentDisplayDelay = currentTime - lastTimeDisplay;
   if (currentDisplayDelay >= displayDelay)
   {
-
     char str[5]; // 4 car + 0 de fin de string
     sprintf(str, "%4d", orderSpeed);
     oled.drawString(12, 2, str);
@@ -180,11 +179,12 @@ void loop()
     sprintf(str, "%4d", measuredSpeed);
     oled.drawString(12, 3, str);
 
-    sprintf(str, "%4d", 100 * (orderSpeed - measuredSpeed) / orderSpeed);
-    oled.drawString(12, 4, str);
+    double erreur = 100.0 * ((double)orderSpeed - (double)measuredSpeed) / (double)orderSpeed;
+    sprintf(str, "%6d", (int)erreur); // pas de %f dans la librairie Arduino !
+    oled.drawString(10, 4, str);
 
     sprintf(str, "%3d", 100 * motorDC / 255);
-    oled.drawString(12, 5, str);
+    oled.drawString(13, 5, str);
 
     lastTimeDisplay = currentTime;
 
