@@ -7,8 +7,8 @@
 // Mehdi 16/10/2021
 
 // choix du microcontrôleur cible
-//#define ATMEGA2560
-#define ATTINY85
+#define ATMEGA2560
+//#define ATTINY85
 
 //====================
 // ATTINY85
@@ -120,6 +120,9 @@ void setup()
   // initialisation des instants de calcul
   lastTimeDisplay = millis();
   lastTimeStateCounter = millis(); // initialisation des instants de mesure
+
+  // initialisation du moniteur série
+  Serial.begin(9600);
 }
 
 //========
@@ -172,19 +175,30 @@ void loop()
   currentDisplayDelay = currentTime - lastTimeDisplay;
   if (currentDisplayDelay >= displayDelay)
   {
+    // affichage de la vitesse de consigne du potentiomètre
     char str[5]; // 4 car + 0 de fin de string
     sprintf(str, "%4d", orderSpeed);
     oled.drawString(12, 2, str);
 
+    // affichage de la vitesse mesurée
     sprintf(str, "%4d", measuredSpeed);
     oled.drawString(12, 3, str);
 
+    // affichage de l'erreur mesurée
     double erreur = 100.0 * ((double)orderSpeed - (double)measuredSpeed) / (double)orderSpeed;
     sprintf(str, "%6d", (int)erreur); // pas de %f dans la librairie Arduino !
     oled.drawString(10, 4, str);
 
+    // affichage du % de tension appliqué sur le moteur
     sprintf(str, "%3d", 100 * motorDC / 255);
     oled.drawString(13, 5, str);
+
+    // affichage sur le moniteur série
+    Serial.print(orderSpeed);
+    Serial.print(";");
+    Serial.print(measuredSpeed);
+    Serial.print(";");
+    Serial.println(erreur);
 
     lastTimeDisplay = currentTime;
 
