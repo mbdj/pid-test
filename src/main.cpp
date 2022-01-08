@@ -4,7 +4,11 @@
 #include <U8x8lib.h> // bibliothèque pour l'écran OLED
 
 // Asservissement d'un moteur CC
-// Mehdi 16/10/2021
+// Mehdi 02/01/2022
+
+// Contrôle par ATMega2560 qui permet la sortie série
+// Les résultats de la sortie série peuvent être analysés dans XLS (courbe)
+// Cette version by-passe le potentiomètre pour imposer une consigne déterminée (en particulier pour analyser la réponse d'une consigne "carrée")
 
 // choix du microcontrôleur cible
 #define ATMEGA2560
@@ -39,10 +43,16 @@
 unsigned long currentTime; // instant de le mesure courante du capteur
 
 // Ecran OLED
-U8X8_SSD1306_128X64_NONAME_SW_I2C oled(SCL, SDA, /* reset=*/U8X8_PIN_NONE);
+// U8X8_SSD1306_128X64_NONAME_SW_I2C oled(SCL, SDA, /* reset=*/U8X8_PIN_NONE);
 
-const int displayDelay{500}; // délai d'affichage. nb : on affiche peu souvent car l'affichage est très long
+const int displayDelay{100}; // délai d'affichage. nb : on affiche peu souvent car l'affichage est long
 unsigned long lastTimeDisplay;
+unsigned long currentDisplayDelay; // délai depuis le dernier affichage
+
+// spécification du signal carré qui sert de consigne
+const int SquareHalfPeriod{3000}; // Demi période en ms du signal carré donné en consigne ; à chaque demi-période on bascule du niveau haut au niveua bas
+unsigned long lastTimeSquareHalfPeriod;
+unsigned long currentTimeSquareHalfPeriod;
 
 // Capteur réflechissant TCRT5000
 const uint8_t pinIN_IRsensor{PIN_pinIN_IRsensor}; // pin de lecture du capteur : HIGH si capte un objet réfléchissant à proximité sinon LOW
@@ -52,8 +62,9 @@ unsigned long changeStateCounter{0};              // compteur du nombre de chang
 const int numberOfBlades{4}; // nombre de pales du moteur sur lesquelles se réflechit la lumière du capteur
                              // pour chaque pale on a 2 changements d'état du capteur
 
-unsigned long lastTimeStateCounter;         // instant de la dernière mesure du capteur
-const unsigned long stateCounterDelay{100}; // délai de mesure en milliseconde
+unsigned long lastTimeStateCounter;        // instant de la dernière mesure du capteur
+const unsigned long stateCounterDelay{20}; // délai de mesure en milliseconde
+unsigned long currentStateCounterDelay;    // délai depuis le début du comptage ; sert à déterminer la vitesse du moteur
 // nb : une boucle loop() fait 160us pour le comptage, 2 ms pour l'asservissement et environ 276 ms pour l'affichage lcd !
 
 // valeurs lues sur le capteur (HIGH ou LOW) ; old et new pour identifier les changements d'état
@@ -66,12 +77,9 @@ int orderSpeed{0};          // vitesse de consigne pour le moteur (déterminée 
 int measuredSpeed;          // vitesse mesurée du moteur en tr/min
 int motorDC{0};             // tension DC appliquée sur le moteur pour se rapprocher de la  vitesse de consigne
 
-unsigned long currentStateCounterDelay; // délai depuis le début du comptage ; sert à déterminer la vitesse du moteur
-unsigned long currentDisplayDelay;      // délai depuis le dernier affichage
-
 // asservissement
 // coefficient proportionnel appliqué à la différence entre la consigne et la mesure et qui est rajoutée/enlevée à la tension du moteur
-const float fraction{1.0 / 2.0};                   // fraction de la différence entre consigne et mesure appliquée pour rattrapper la consigne
+const float fraction{200.0 / 1.0};                 // fraction de la différence entre consigne et mesure appliquée pour rattrapper la consigne
 const float factor{fraction * (255.0 / maxSpeed)}; // cette fraction de vitesse 0 à maxSpeed est ramenée en fraction de commande moteur 0 à 254
 
 // pré-calcul de 2 coefficients pour des raisons de performance
@@ -95,18 +103,18 @@ const uint8_t pinIN_Pot{PIN_pinIN_Pot}; // pin pour la lecture du potentiomètre
 // setup()
 //=========
 void setup()
-{
-  // initialisation de l'écran OLED
-  oled.begin();
-  // oled.setPowerSave(0);
-  oled.setFont(u8x8_font_chroma48medium8_r);
+{ /*
+   // initialisation de l'écran OLED
+   oled.begin();
+   // oled.setPowerSave(0);
+   oled.setFont(u8x8_font_chroma48medium8_r);
 
-  oled.drawString(0, 0, "ASSERVISSEMENT");
-  oled.drawString(0, 2, "consigne");
-  oled.drawString(0, 3, "mesure");
-  oled.drawString(0, 4, "\% erreur");
-  oled.drawString(0, 5, "\% commande");
-
+   oled.drawString(0, 0, "ASSERVISSEMENT");
+   oled.drawString(0, 2, "consigne");
+   oled.drawString(0, 3, "mesure");
+   oled.drawString(0, 4, "\% erreur");
+   oled.drawString(0, 5, "\% commande");
+ */
   // initialisation du potentiomètre
   pinMode(pinIN_Pot, INPUT);
 
@@ -120,9 +128,10 @@ void setup()
   // initialisation des instants de calcul
   lastTimeDisplay = millis();
   lastTimeStateCounter = millis(); // initialisation des instants de mesure
+  lastTimeSquareHalfPeriod = millis();
 
   // initialisation du moniteur série
-  Serial.begin(9600);
+  Serial.begin(115200);
 }
 
 //========
@@ -141,6 +150,7 @@ void loop()
   // quand le delai de mesure est atteint on recalcule la tension à appliquer sur le moteur et on réinitialise le compteur
   currentTime = millis();
   currentStateCounterDelay = currentTime - lastTimeStateCounter; // délai depuis le début du comptage
+  currentTimeSquareHalfPeriod = currentTime - lastTimeSquareHalfPeriod;
 
   if (currentStateCounterDelay >= stateCounterDelay)
   {
@@ -149,7 +159,18 @@ void loop()
     // on rattrape la consigne en injectant une fraction de la différence entre consigne et mesure (erreur)
 
     // lecture du potentiomètre qui fixe la consigne de vitesse du moteur en tr/min
-    orderSpeed = analogRead(pinIN_Pot) * maxSpeed / 1023;
+    // orderSpeed = analogRead(pinIN_Pot) * maxSpeed / 1023;
+
+    // Dans cette version la consigne est calculée
+    if (currentTimeSquareHalfPeriod >= SquareHalfPeriod)
+    {
+      if (orderSpeed == 0)
+        orderSpeed = 4000;
+      else
+        orderSpeed = 0;
+
+      lastTimeSquareHalfPeriod = currentTime;
+    }
 
     if (orderSpeed > measuredSpeed)
     {
@@ -174,30 +195,31 @@ void loop()
   // affichage si délai atteint
   currentDisplayDelay = currentTime - lastTimeDisplay;
   if (currentDisplayDelay >= displayDelay)
-  {
-    // affichage de la vitesse de consigne du potentiomètre
-    char str[5]; // 4 car + 0 de fin de string
-    sprintf(str, "%4d", orderSpeed);
-    oled.drawString(12, 2, str);
+  { /*
+     // affichage de la vitesse de consigne du potentiomètre
+     char str[5]; // 4 car + 0 de fin de string
+     sprintf(str, "%4d", orderSpeed);
+     oled.drawString(12, 2, str);
 
-    // affichage de la vitesse mesurée
-    sprintf(str, "%4d", measuredSpeed);
-    oled.drawString(12, 3, str);
+     // affichage de la vitesse mesurée
+     sprintf(str, "%4d", measuredSpeed);
+     oled.drawString(12, 3, str);
 
-    // affichage de l'erreur mesurée
-    double erreur = 100.0 * ((double)orderSpeed - (double)measuredSpeed) / (double)orderSpeed;
-    sprintf(str, "%6d", (int)erreur); // pas de %f dans la librairie Arduino !
-    oled.drawString(10, 4, str);
+     // affichage de l'erreur mesurée
+     double erreur = 100.0 * ((double)orderSpeed - (double)measuredSpeed) / (double)orderSpeed;
+     sprintf(str, "%6d", (int)erreur); // pas de %f dans la librairie Arduino !
+     oled.drawString(10, 4, str);
 
-    // affichage du % de tension appliqué sur le moteur
-    sprintf(str, "%3d", 100 * motorDC / 255);
-    oled.drawString(13, 5, str);
-
+     // affichage du % de tension appliqué sur le moteur
+     sprintf(str, "%3d", 100 * motorDC / 255);
+     oled.drawString(13, 5, str);
+ */
     // affichage sur le moniteur série
     Serial.print(orderSpeed);
     Serial.print(";");
     Serial.print(measuredSpeed);
     Serial.print(";");
+    double erreur = 100.0 * ((double)orderSpeed - (double)measuredSpeed) / (double)orderSpeed;
     Serial.println(erreur);
 
     lastTimeDisplay = currentTime;
