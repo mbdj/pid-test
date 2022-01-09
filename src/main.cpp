@@ -4,11 +4,13 @@
 #include <U8x8lib.h> // bibliothèque pour l'écran OLED
 
 // Asservissement d'un moteur CC
-// Mehdi 02/01/2022
-
+// Mehdi 09/01/2022
+//
 // Contrôle par ATMega2560 qui permet la sortie série
 // Les résultats de la sortie série peuvent être analysés dans XLS (courbe)
 // Cette version by-passe le potentiomètre pour imposer une consigne déterminée (en particulier pour analyser la réponse d'une consigne "carrée")
+// l'asservissement perso est remplacé par un asservissement PID de type standard :
+// commande = Kp * (erreur + Kd * dérivée(erreur) + Ki Intégrale(erreur))
 
 // choix du microcontrôleur cible
 #define ATMEGA2560
@@ -75,12 +77,20 @@ int sensorOldValue;
 const float maxSpeed{8000}; // vitesse maximum du moteur en tr/min
 int orderSpeed{0};          // vitesse de consigne pour le moteur (déterminée par la valeur du potentiomètre)
 int measuredSpeed;          // vitesse mesurée du moteur en tr/min
-int motorDC{0};             // tension DC appliquée sur le moteur pour se rapprocher de la  vitesse de consigne
+float motorDC{0};           // tension DC appliquée sur le moteur pour se rapprocher de la  vitesse de consigne
 
 // asservissement
 // coefficient proportionnel appliqué à la différence entre la consigne et la mesure et qui est rajoutée/enlevée à la tension du moteur
-const float fraction{200.0 / 1.0};                 // fraction de la différence entre consigne et mesure appliquée pour rattrapper la consigne
-const float factor{fraction * (255.0 / maxSpeed)}; // cette fraction de vitesse 0 à maxSpeed est ramenée en fraction de commande moteur 0 à 254
+// const float fraction{200.0 / 1.0};                 // fraction de la différence entre consigne et mesure appliquée pour rattrapper la consigne
+// const float factor{fraction * (255.0 / maxSpeed)}; // cette fraction de vitesse 0 à maxSpeed est ramenée en fraction de commande moteur 0 à 254
+//
+// coefficients de l'asservissement PID
+const float Kp{10.0};
+const float Kd{0.0};
+const float Ki{0.0};
+long error;
+float lastError{0.0};
+float sumError{0.0};
 
 // pré-calcul de 2 coefficients pour des raisons de performance
 const float coeffCalculVitesse{60000.0 / ((float)numberOfBlades * 2.0)}; // pour le calcul de la vitesse mesurée
@@ -161,7 +171,7 @@ void loop()
     // lecture du potentiomètre qui fixe la consigne de vitesse du moteur en tr/min
     // orderSpeed = analogRead(pinIN_Pot) * maxSpeed / 1023;
 
-    // Dans cette version la consigne est calculée
+    // Dans cette version la consigne est calculée. C'est un signal carré
     if (currentTimeSquareHalfPeriod >= SquareHalfPeriod)
     {
       if (orderSpeed == 0)
@@ -172,6 +182,29 @@ void loop()
       lastTimeSquareHalfPeriod = currentTime;
     }
 
+    // Régulation PID mixte
+    error = orderSpeed - measuredSpeed;
+    sumError += error;
+    motorDC = Kp * (error + Kd * (error - lastError) + Ki * sumError);
+    // motorDC = 10 * error;
+    lastError = error;
+
+    /*
+        Serial.print("(");
+        Serial.print(error);
+        Serial.print(")");
+        Serial.print("[");
+        Serial.print(motorDC);
+        Serial.print("]");
+    */
+
+    if (motorDC > 255)
+      motorDC = 255;
+    else if (motorDC < 0)
+      motorDC = 0;
+
+    /*
+    // Régulation "perso"
     if (orderSpeed > measuredSpeed)
     {
       motorDC += (orderSpeed - measuredSpeed) * factor;
@@ -184,6 +217,7 @@ void loop()
       if (motorDC < 0)
         motorDC = 0;
     }
+    */
 
     motorRun(motorDC);
 
@@ -221,6 +255,10 @@ void loop()
     Serial.print(";");
     double erreur = 100.0 * ((double)orderSpeed - (double)measuredSpeed) / (double)orderSpeed;
     Serial.println(erreur);
+    Serial.print(error);
+    Serial.print(";");
+    Serial.print(motorDC);
+    Serial.print(";");
 
     lastTimeDisplay = currentTime;
 
