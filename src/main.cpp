@@ -79,7 +79,7 @@ int motorDC{0};             // tension DC appliquée sur le moteur pour se rappr
 
 // asservissement
 // coefficient proportionnel appliqué à la différence entre la consigne et la mesure et qui est rajoutée/enlevée à la tension du moteur
-const float fraction{200.0 / 1.0};                 // fraction de la différence entre consigne et mesure appliquée pour rattrapper la consigne
+const float fraction{10};                          // fraction de la différence entre consigne et mesure appliquée pour rattrapper la consigne
 const float factor{fraction * (255.0 / maxSpeed)}; // cette fraction de vitesse 0 à maxSpeed est ramenée en fraction de commande moteur 0 à 254
 
 // pré-calcul de 2 coefficients pour des raisons de performance
@@ -220,7 +220,9 @@ void loop()
     Serial.print(measuredSpeed);
     Serial.print(";");
     double erreur = 100.0 * ((double)orderSpeed - (double)measuredSpeed) / (double)orderSpeed;
-    Serial.println(erreur);
+    Serial.print(erreur);
+    Serial.print(";");
+    Serial.println(motorDC);
 
     lastTimeDisplay = currentTime;
 
