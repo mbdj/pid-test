@@ -3,21 +3,5 @@
 .vscode/c_cpp_properties.json
 .vscode/launch.json
 .vscode/ipch
-asserv2.csv
-asserv3.csv
-asserv3.xlsx
-asserv4.csv
-asserv4.xlsx
-asserv5.csv
-asserv5.xlsx
-asserv6.csv
-asserv6.xlsx
-asserv7.csv
-asserv7.xlsx
-asserv8.csv
-asserv9.csv
-asserv9.xlsx
-asserv10.csv
-asserv10.xlsx
-asservissement signal carré.xlsx
-asservissement.xlsx
+*.csv
+*.xlsx
