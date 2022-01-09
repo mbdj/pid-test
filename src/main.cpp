@@ -85,9 +85,9 @@ float motorDC{0};           // tension DC appliquée sur le moteur pour se rappr
 // const float factor{fraction * (255.0 / maxSpeed)}; // cette fraction de vitesse 0 à maxSpeed est ramenée en fraction de commande moteur 0 à 254
 //
 // coefficients de l'asservissement PID
-const float Kp{10.0};
-const float Kd{0.0};
-const float Ki{0.0};
+const float Kp{20.0};
+const float Kd{1};
+const float Ki{0.1};
 long error;
 float lastError{0.0};
 float sumError{0.0};
@@ -186,17 +186,7 @@ void loop()
     error = orderSpeed - measuredSpeed;
     sumError += error;
     motorDC = Kp * (error + Kd * (error - lastError) + Ki * sumError);
-    // motorDC = 10 * error;
     lastError = error;
-
-    /*
-        Serial.print("(");
-        Serial.print(error);
-        Serial.print(")");
-        Serial.print("[");
-        Serial.print(motorDC);
-        Serial.print("]");
-    */
 
     if (motorDC > 255)
       motorDC = 255;
@@ -254,11 +244,11 @@ void loop()
     Serial.print(measuredSpeed);
     Serial.print(";");
     double erreur = 100.0 * ((double)orderSpeed - (double)measuredSpeed) / (double)orderSpeed;
-    Serial.println(erreur);
+    Serial.print(erreur);
     Serial.print(error);
     Serial.print(";");
     Serial.print(motorDC);
-    Serial.print(";");
+    Serial.println(";");
 
     lastTimeDisplay = currentTime;
 
